@@ -19,17 +19,27 @@ if [ -z "${WS_PATH:-}" ]; then
   exit 1
 fi
 
-# Fallback for builders that do not use the Dockerfile: fetch xray if missing.
-if ! command -v xray >/dev/null 2>&1 && [ ! -x /usr/local/bin/xray ]; then
+# Find the xray binary: Docker image, build-time download, or fetch it now.
+XRAY_BIN=""
+if command -v xray >/dev/null 2>&1; then
+  XRAY_BIN="xray"
+elif [ -x /usr/local/bin/xray ]; then
+  XRAY_BIN="/usr/local/bin/xray"
+elif [ -x ./xray-bin/xray ]; then
+  XRAY_BIN="./xray-bin/xray"
+elif [ -x /tmp/xray-bin/xray ]; then
+  XRAY_BIN="/tmp/xray-bin/xray"
+else
   echo "xray binary not found, downloading latest release..."
   mkdir -p /tmp/xray-bin
   curl -fsSL -o /tmp/xray.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
   unzip -o /tmp/xray.zip -d /tmp/xray-bin
-  export PATH="/tmp/xray-bin:$PATH"
+  chmod +x /tmp/xray-bin/xray
+  XRAY_BIN="/tmp/xray-bin/xray"
 fi
 
-mkdir -p /etc/xray
-cat > /etc/xray/config.json <<EOF
+mkdir -p /tmp/xray
+cat > /tmp/xray/config.json <<EOF
 {
   "log": { "loglevel": "warning" },
   "inbounds": [
@@ -56,4 +66,4 @@ cat > /etc/xray/config.json <<EOF
 }
 EOF
 
-exec xray run -c /etc/xray/config.json
+exec "$XRAY_BIN" run -c /tmp/xray/config.json
